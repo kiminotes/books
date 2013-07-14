@@ -20,6 +20,10 @@
 
 #define HTTP_PORT       80
 #define MAX_GET_COMMAND 255
+#define BUFFER_SIZE     255
+
+int http_get( int, const char *, const char * );
+void display_result( int );
 
 /**
  * Accept a well-formed URL (e.g. http://company.com/index.html) and return
@@ -112,7 +116,7 @@ int main( int argc, char *argv[] )
     host_address.sin_port = htons( HTTP_PORT );
     memcpy( &host_address.sin_addr, host_name->h_addr_list[0], sizeof( struct in_addr ) );
 
-    if ( connect(client_connection, ( struct sockaddr * )host_address, sizeof( host_address )) == -1 )
+    if ( connect(client_connection, ( struct sockaddr * )&host_address, sizeof( host_address )) == -1 )
     {
         perror( "Unable to connect to host" );
         return 4;
@@ -149,6 +153,45 @@ int main( int argc, char *argv[] )
  * on success, -1 on failure, with errno set appropriately. The caller
  * must then retrieve the response.
  */
-int http_get( int client_connection, const char *path, const char *host)
+int http_get( int connection, const char *path, const char *host)
 {
+    static char get_command[ MAX_GET_COMMAND ];
+
+    sprintf( get_command, "GET /%s HTTP/1.1\r\n", path );
+    if ( send( connection, get_command, strlen( get_command ), 0) == -1 )
+    {
+        return -1;
+    }
+
+    sprintf( get_command, "Host: %s\r\n", host );
+    if ( send(connection, get_command, sizeof( get_command ), 0) == -1 )
+    {
+        return -1;
+    }
+
+    sprintf( get_command, "Connection: close\r\n\r\n");
+    if ( send( connection, get_command, sizeof( get_command ), 0 ) == -1 )
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+
+/**
+ * Receive all data available on a connection and dump it to stdout
+ */
+void display_result( int connection )
+{
+    int received =  0;
+
+    static char recv_buf[ BUFFER_SIZE + 1 ];
+
+    while ( ( received = recv( connection, recv_buf, BUFFER_SIZE, 0 ) ) > 0 )
+    {
+        recv_buf[ received ] = '\0';
+        printf( recv_buf );
+    }
+    printf( "\n" );
 }
